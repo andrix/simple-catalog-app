@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>{{ item.name }}</h1>
+<h3>{{ item.category.name }}</h3>
+
+<p>
+Description: {{ item.description }}
+</p>
+
+<a href="{{ url_for('item_edit', item_id=item.id) }}">Edit</a> |
+<a href="{{ url_for('item_delete', item_id=item.id) }}">Delete</a>
+
+
+{% endblock %}

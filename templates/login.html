@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Login</h1>
+
+<p>We provide the following methods to login to our app:</p>
+
+<table class="login-table">
+  <tr>
+    <td>
+      <!-- GOOGLE PLUS SIGN IN-->
+      <div id="signInButton">
+        <span class="g-signin"
+          data-scope="openid email"
+          data-clientid="238091389217-l41kn7ohkfvps62sm7bj3t87uepjuhk5.apps.googleusercontent.com"
+          data-redirecturi="postmessage"
+          data-accesstype="offline"
+          data-cookiepolicy="single_host_origin"
+          data-callback="signInCallback"
+          data-approvalprompt="force">
+        </span>
+      </div>
+    </td>
+    <td>
+      Facebook
+    </td>
+  </tr>
+</table>
+
+
+<div id="result"></div>
+
+<script>
+function signInCallback(authResult) {
+  if (authResult['code']) {
+
+    // Hide the sign-in button now that the user is authorized
+    $('#signinButton').attr('style', 'display: none');
+
+    // Send the one-time-use code to the server, if the server responds, write a 'login successful' message to the web page and then redirect back to the main restaurants page
+    $.ajax({
+      type: 'POST',
+      url: '/gconnect?state={{STATE}}',
+      processData: false,
+      data: authResult['code'],
+      contentType: 'application/octet-stream; charset=utf-8',
+      success: function(result) {
+        // Handle or verify the server response if necessary.
+        var msg = "";
+        if (result) {
+          msg = 'Login Successful! Redirecting...';
+          $('#result').html(msg)
+          setTimeout(function() { window.location.href = "/catalog" }, 1000);
+        } else if (authResult['error']) {
+          console.log('There was an error: ' + authResult['error']);
+        } else {
+          msg = "Failed to make a server-side call. " +
+            "Check your configuration and console.";
+          $('#result').html(msg);
+         }
+      }
+    });
+  }
+}
+</script>
+
+{% endblock %}

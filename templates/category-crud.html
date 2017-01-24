@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if category %}
+<h2>Category: Edit {{ category.name }}</h2>
+{% else %}
+<h2>Category: Add</h2>
+{% endif %}
+
+<form method="post">
+    <table>
+        <tr>
+            <td>
+                <label>Name</label>
+            </td>
+            <td>
+                <input type="text" name="name" value="{{ name }}">
+            </td>
+        </tr>
+    </table>
+    <!-- <input type="hidden" name="post_id" value="{{ post_id }}"> -->
+
+    <div class="error">{{ error }}</div>
+    <input type="submit">
+    {% if category %}
+        <!-- <a href="/blog/admin/posts/">Cancel</a> -->
+    {% endif %}
+</form>
+{% endblock %}

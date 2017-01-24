@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if item %}
+<h2>Item: Edit {{ item.name }}</h2>
+{% else %}
+<h2>Item: Add</h2>
+{% endif %}
+
+<form method="post">
+    <table>
+        <tr>
+            <td>
+                Title:
+                <input type="text" name="name" value="{{ item.name if item else '' }}">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Description:
+                <input type="text" name="description" value="{{ item.description if item else '' }}">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Category:
+                <select name="category">
+                {% for cat in categories %}
+                    <option value="{{ cat.name}},{{ cat.id }}"
+                    {{ "selected" if item and cat.name == item.category.name else ""}}>
+                    {{ cat.name }}</option>
+                {% endfor %}
+                </select>
+            </td>
+        </tr>
+    </table>
+    <!-- <input type="hidden" name="post_id" value="{{ post_id }}"> -->
+
+    <div class="error">{{ error }}</div>
+    <input type="submit">
+    {% if item %}
+        <!-- <a href="/blog/admin/posts/">Cancel</a> -->
+    {% endif %}
+</form>
+{% endblock %}

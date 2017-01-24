@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Delete item</h1>
+
+<p>
+Are you sure you want to delete item: {{ item.name }}?
+</p>
+<form method="POST">
+    <input type="submit" value="Yes">
+</form>
+<a href="{{ url_for('catalog_show') }}">Cancel</a>
+
+{% endblock %}

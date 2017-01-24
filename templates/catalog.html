@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-sm-4 col-md-4 categories-container">
+        {% if current_user %}
+        <p><a href="{{ url_for('category_add') }}">Add category</a></p>
+        {% endif %}
+
+        <h2>Categories</h2>
+        <hr>
+        <table>
+        {% for cat in categories %}
+          <tr><td><a href="{{ url_for('category_items', category=cat.name) }}">{{ cat.name }}</a></td></tr>
+        {% endfor %}
+        </table>
+
+    </div>
+    <div class="col-sm-8 col-md-8 items-container">
+        {% if current_user %}
+        <p><a href="{{ url_for('item_add') }}">Add Item</a>
+        <br>
+        {% endif %}
+
+        {% if category %}
+        <h2>{{ category.name }} ({{ items|length }})</h2>
+        {% else %}
+        <h2>Latest items</h2>
+        {% endif %}
+
+        <table>
+        {% for item in items %}
+          <tr>
+            <td>
+              <a href="{{ url_for('item_show', category=item.category.name, item=item.name) }}">
+              {{ item.name }} ({{ item.category.name }})
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}

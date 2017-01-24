@@ -1,0 +1,49 @@
+body {
+    background-color: #30231d;
+}
+
+.top-bar {
+    background-color: #f6f1ed;
+}
+
+.top-bar a {
+    color: #30231d;
+}
+
+.content {
+    background-color: #6a5750;
+    width: 70%;
+    margin: 0 auto;
+    height: 100%;
+    border: 1px solid white;
+}
+
+.content a {
+    color: #f6f1ed;
+}
+.content h2 {
+    color: #b5a397;
+}
+
+.categories-container {
+    padding: 2em;
+}
+
+.items-container {
+    border-left: 1px solid #ccc;
+    padding: 2em;
+}
+
+.login-button {
+  background-color: #97743a;
+  font-weight: bold;
+  color: black;
+  margin-top: 2em;
+  margin-right: 2em;
+}
+
+.login-table {
+    min-width: 100%;
+    margin: 2%;
+    padding: 3%;
+}
