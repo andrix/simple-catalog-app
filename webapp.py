@@ -87,7 +87,7 @@ def showLogin():
     return render_template('login.html', STATE=state)
 
 def json_response(content, http_code=200):
-    response = make_response(json.dumps(content), 401)
+    response = make_response(json.dumps(content), http_code)
     response.headers['Content-Type'] = 'application/json'
     return response
 
@@ -228,6 +228,16 @@ def catalog_json():
         yield items.next().json()
         yield "]"
     return Response(generate(), mimetype='application/json')
+
+@app.route("/item.json/<int:item_id>")
+def item_json(item_id):
+    if item_id is None:
+        return json_response("No item id provided.", 500)
+
+    item = session.query(Item).filter_by(id=item_id).first()
+    if not item:
+        return json_response("Item with id `%s` not found" % item_id, 404)
+    return Response(item.json(), mimetype="application/json")
 
 
 @app.route("/catalog/category/add", methods=["GET", "POST"])
