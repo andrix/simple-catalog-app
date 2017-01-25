@@ -44,8 +44,11 @@ class UserControl(object):
 
     @classmethod
     def create_user(cls, login_session):
-        newUser = User(name=login_session["username"],
-            email=login_session["email"], picture=login_session["picture"])
+        newUser = User(
+            name=login_session["username"],
+            email=login_session["email"],
+            picture=login_session["picture"]
+        )
         session.add(newUser)
         session.commit()
         user = session.query(User).filter_by(email=newUser.email).one()
@@ -69,6 +72,7 @@ class UserControl(object):
         current_user = UserControl.get_user_by_id(user_id) if user_id else None
         return current_user
 
+
 def render_template(template_name, **context):
     current_user = UserControl.current_user()
     context['current_user'] = current_user
@@ -79,6 +83,7 @@ def render_template(template_name, **context):
 def index():
     return redirect(url_for("catalog_show"))
 
+
 # Create anti-forgery state token
 @app.route('/login')
 def showLogin():
@@ -86,10 +91,12 @@ def showLogin():
     login_session['state'] = state
     return render_template('login.html', STATE=state)
 
+
 def json_response(content, http_code=200):
     response = make_response(json.dumps(content), http_code)
     response.headers['Content-Type'] = 'application/json'
     return response
+
 
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
@@ -122,8 +129,10 @@ def gconnect():
     # Verify that the access token is used for the intended user.
     gplus_id = credentials.id_token['sub']
     if result['user_id'] != gplus_id:
-        return json_response("Token's user ID doesn't match given user ID.",
-            401)
+        return json_response(
+            "Token's user ID doesn't match given user ID.",
+            401
+        )
     # Verify that the access token is valid for this app.
     if result['issued_to'] != CLIENT_ID:
         return json_response("Token's client ID does not match app's.", 401)
@@ -170,6 +179,7 @@ def gconnect():
     flash("you are now logged in as %s" % user.name)
     return json_response("OK")
 
+
 @app.route('/logout')
 def logout():
     # Disconnect from Google
@@ -182,8 +192,9 @@ def logout():
         if access_token is None:
             return json_response('Current user not connected.', 401)
 
-        url =  ACCESS_TOKEN_REVOKE_URL % login_session['access_token']
+        url = ACCESS_TOKEN_REVOKE_URL % login_session['access_token']
         result = requests.get(url)
+
         def _clean_session():
             del login_session['access_token']
             del login_session['gplus_id']
@@ -200,8 +211,12 @@ def logout():
             info = result.json()
             if info.get("error") == "invalid_token":
                 _clean_session()
-                return render_template("error.html", error="You have already being logged out.")
-            error="We can't log you out from the app. Reason: %s" % result.text
+                return render_template(
+                    "error.html",
+                    error="You have already being logged out."
+                )
+            error = "We can't log you out from the app."
+            error += " Reason: %s" % result.text
             return render_template("error.html", error=error)
 
     # Handle other log out methods
@@ -212,6 +227,7 @@ def catalog_show():
     cats = session.query(Category).all()
     items = session.query(Item).order_by(Item.created.desc()).limit(10)
     return render_template("catalog.html", categories=cats, items=items)
+
 
 @app.route("/catalog.json")
 def catalog_json():
@@ -228,6 +244,7 @@ def catalog_json():
         yield items.next().json()
         yield "]"
     return Response(generate(), mimetype='application/json')
+
 
 @app.route("/item.json/<int:item_id>")
 def item_json(item_id):
@@ -258,13 +275,19 @@ def category_add():
     else:
         return redirect()
 
+
 @app.route("/catalog/<category>", methods=["GET"])
 def category_items(category):
     cats = session.query(Category).all()
     cat = session.query(Category).filter_by(name=category).first()
     items = session.query(Item).filter_by(category_id=cat.id).all()
-    return render_template("catalog.html", items=items, categories=cats,
-        category=cat)
+    return render_template(
+        "catalog.html",
+        items=items,
+        categories=cats,
+        category=cat
+    )
+
 
 def item_add_edit(item_id=None):
     cats = session.query(Category).all()
@@ -285,12 +308,18 @@ def item_add_edit(item_id=None):
             item.category_id = cat.id
             item.category = cat
         else:
-            item = Item(name=item_name, description=description,
-                category_id=category_id)
+            item = Item(
+                name=item_name,
+                description=description,
+                category_id=category_id
+            )
             session.add(item)
         session.commit()
-        return redirect(url_for("item_show", category=item.category.name,
-            item=item.name))
+        return redirect(url_for(
+            "item_show",
+            category=item.category.name,
+            item=item.name
+        ))
     else:
         return
 
@@ -302,12 +331,14 @@ def item_add():
         abort(401)
     return item_add_edit()
 
+
 @app.route("/catalog/item/edit/<int:item_id>", methods=['GET', 'POST'])
 def item_edit(item_id):
     user = UserControl.current_user()
     if not user or login_session['user_id'] != user.id:
         abort(401)
     return item_add_edit(item_id)
+
 
 @app.route("/catalog/item/delete/<int:item_id>", methods=['GET', 'POST'])
 def item_delete(item_id):
@@ -326,8 +357,10 @@ def item_delete(item_id):
 
         session.query(Item).filter_by(id=item.id).delete()
         session.commit()
-        flash("Item '%s' from category '%s' was deleted." % (item_name,
-            cat_name))
+        flash("Item '%s' from category '%s' was deleted." % (
+            item_name,
+            cat_name
+        ))
         return redirect(url_for("catalog_show"))
     else:
         return
@@ -339,19 +372,24 @@ def item_show(category, item):
     cat = session.query(Category).filter_by(name=category).first()
     if not cat:
         return redirect(url_for("page_not_found"))
-    item = session.query(Item).filter_by(name=item,
-        category_id=cat.id).first()
+    item = session.query(Item).filter_by(
+        name=item,
+        category_id=cat.id
+    ).first()
     if not item:
         return redirect(url_for("page_not_found"))
     return render_template("item.html", item=item)
+
 
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('page_not_found.html'), 404
 
+
 @app.errorhandler(500)
 def error_ocurred(error):
     return render_template('error.html'), 500
+
 
 if __name__ == "__main__":
     app.run()

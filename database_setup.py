@@ -1,5 +1,3 @@
-import os
-import sys
 import json
 
 from sqlalchemy.sql import func
@@ -43,14 +41,17 @@ class Item(Base):
     updated = Column(DateTime(timezone=True), onupdate=func.now())
 
     category_id = Column(Integer, ForeignKey("category.id"))
-    category = relationship(Category,
+    category = relationship(
+        Category,
         cascade="save-update, merge, refresh-expire, expunge",
-        single_parent=True)
+        single_parent=True
+    )
 
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship(User)
 
-    def json(self):
+    def serialize(self):
+
         item = {
             "id": self.id,
             "name": self.name,
@@ -60,7 +61,11 @@ class Item(Base):
         }
         if self.updated:
             item["updated"] = self.updated.isoformat()
-        return json.dumps(item)
+        return item
+
+    def json(self):
+        return json.dumps(self.serialize())
+
 
 engine = create_engine("sqlite:///categories.db")
 Base.metadata.create_all(engine)
