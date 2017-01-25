@@ -4,7 +4,7 @@ import requests
 import hashlib
 
 from flask import Flask, request, redirect, url_for, flash, abort, Response
-from flask import session as login_session, make_response
+from flask import session as login_session, make_response, jsonify
 from flask import render_template as flask_render_template
 
 from sqlalchemy import create_engine
@@ -14,33 +14,33 @@ from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 
 from database_setup import Base, Item, Category, User
+from utils import SimpleCache
 
 
+# Load the client_id from Google credentials file.
 CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
 APPLICATION_NAME = "Udacity-Catalog-App"
 
+# Set up database section
 engine = create_engine("sqlite:///categories.db")
 Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+# Set up Flask application.
 app = Flask(__name__)
 app.secret_key = "f76dcfe22fbc15e4286745fd981221ed72e34c2fb9622b8689ab584e"
 app.debug = True
 
 
 class UserControl(object):
+    """Control the the access to the Users (model).
 
-    _cache = {}
-    CACHE_SIZE = 100
-
-    @classmethod
-    def _cache_put(cls, key, val):
-        if len(cls._cache) >= cls.CACHE_SIZE:
-            cls._cache.pop()
-        cls._cache[key] = val
+    This is a singleton class for encapsulation purposes.
+    """
+    _cache = SimpleCache()
 
     @classmethod
     def create_user(cls, login_session):
@@ -51,25 +51,29 @@ class UserControl(object):
         )
         session.add(newUser)
         session.commit()
-        user = session.query(User).filter_by(email=newUser.email).one()
-        cls._cache_put(user.id, user)
+        user = session.query(User).filter_by(email=newUser.email).one_or_none()
+        cls._cache.put(user.id, user)
         return user
 
     @classmethod
     def get_user_by_id(cls, user_id):
-        if user_id in cls._cache:
-            return cls._cache.get(user_id)
-        return session.query(User).filter_by(id=user_id).one()
+        user = cls._cache.get(user_id)
+        if not user:
+            user = session.query(User).filter_by(id=user_id).one_or_none()
+            if not user:
+                return None
+            cls._cache.put(user.id, user)
+        return user
 
     @classmethod
     def get_user_by_email(cls, email):
-        user = session.query(User).filter_by(email=email).one()
+        user = session.query(User).filter_by(email=email).one_or_none()
         return user
 
     @classmethod
     def current_user(cls):
         user_id = login_session.get("user_id")
-        current_user = UserControl.get_user_by_id(user_id) if user_id else None
+        current_user = cls.get_user_by_id(user_id) if user_id else None
         return current_user
 
 
@@ -92,21 +96,18 @@ def showLogin():
     return render_template('login.html', STATE=state)
 
 
-def json_response(content, http_code=200):
-    response = make_response(json.dumps(content), http_code)
-    response.headers['Content-Type'] = 'application/json'
-    return response
-
-
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
+    """Function to connect to Google Auth services using OAuth.
+    """
+
     ACCES_TOKEN_URL = \
         'https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s'
     USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo"
 
     # Validate state token
     if request.args.get('state') != login_session['state']:
-        return json_response('Invalid state parameter.', 401)
+        return jsonify('Invalid state parameter.'), 401
 
     # Obtain authorization code
     code = request.data
@@ -116,7 +117,7 @@ def gconnect():
         oauth_flow.redirect_uri = 'postmessage'
         credentials = oauth_flow.step2_exchange(code)
     except FlowExchangeError:
-        return json_response('Failed to upgrade the authorization code.', 401)
+        return jsonify('Failed to upgrade the authorization code.'), 401
 
     # Check that the access token is valid.
     access_token = credentials.access_token
@@ -124,18 +125,16 @@ def gconnect():
 
     # If there was an error in the access token info, abort.
     if result.get('error') is not None:
-        return json_response(result.get('error'), 500)
+        return jsonify(result.get('error')), 500
 
     # Verify that the access token is used for the intended user.
     gplus_id = credentials.id_token['sub']
     if result['user_id'] != gplus_id:
-        return json_response(
-            "Token's user ID doesn't match given user ID.",
-            401
-        )
+        return jsonify("Token's user ID doesn't match given user ID."), 401
+
     # Verify that the access token is valid for this app.
     if result['issued_to'] != CLIENT_ID:
-        return json_response("Token's client ID does not match app's.", 401)
+        return jsonify("Token's client ID does not match app's."), 401
 
     print "Access token: %s" % access_token
 
@@ -156,7 +155,7 @@ def gconnect():
         login_session["username"] = user.name
 
         flash("you are now logged in as %s" % user.name)
-        return json_response("OK")
+        return jsonify("OK")
 
     # Store the access token in the session for later use.
     login_session['access_token'] = access_token
@@ -177,11 +176,14 @@ def gconnect():
     login_session["user_id"] = user.id
 
     flash("you are now logged in as %s" % user.name)
-    return json_response("OK")
+    return jsonify("OK")
 
 
 @app.route('/logout')
 def logout():
+    """Logout from the app, formerly called `gdisconnect`.
+    """
+
     # Disconnect from Google
 
     # Check we're connected using Google OAuth.
@@ -190,12 +192,16 @@ def logout():
             'https://accounts.google.com/o/oauth2/revoke?token=%s'
         access_token = login_session['access_token']
         if access_token is None:
-            return json_response('Current user not connected.', 401)
+            return jsonify('Current user not connected.'), 401
 
         url = ACCESS_TOKEN_REVOKE_URL % login_session['access_token']
         result = requests.get(url)
 
         def _clean_session():
+            """Inner clean session function.
+
+            Clean the keys added when the user logged in to ou
+            """
             del login_session['access_token']
             del login_session['gplus_id']
             del login_session['username']
@@ -218,6 +224,8 @@ def logout():
             error = "We can't log you out from the app."
             error += " Reason: %s" % result.text
             return render_template("error.html", error=error)
+
+    return redirect(url_for("catalog_show"))
 
     # Handle other log out methods
 
@@ -249,12 +257,11 @@ def catalog_json():
 @app.route("/item.json/<int:item_id>")
 def item_json(item_id):
     if item_id is None:
-        return json_response("No item id provided.", 500)
-
+        return jsonify("No item id provided."), 500
     item = session.query(Item).filter_by(id=item_id).first()
     if not item:
-        return json_response("Item with id `%s` not found" % item_id, 404)
-    return Response(item.json(), mimetype="application/json")
+        return jsonify("Item with id `%s` not found" % item_id), 404
+    return jsonify(item.serialize())
 
 
 @app.route("/catalog/category/add", methods=["GET", "POST"])
@@ -263,12 +270,12 @@ def category_add():
     # the user is the logged one.
     user = UserControl.current_user()
     if not user or login_session['user_id'] != user.id:
-        abort(401)
+        redirect(url_for("showLogin"))
 
     if request.method == "GET":
         return render_template("category-crud.html")
     elif request.method == "POST":
-        newcat = Category(name=request.form["name"])
+        newcat = Category(name=request.form["name"], user_id=user.id)
         session.add(newcat)
         session.commit()
         return redirect(url_for("catalog_show"))
@@ -289,7 +296,7 @@ def category_items(category):
     )
 
 
-def item_add_edit(item_id=None):
+def item_add_edit(user, item_id=None):
     cats = session.query(Category).all()
     item = None
     if item_id:
@@ -302,6 +309,9 @@ def item_add_edit(item_id=None):
         category_name, category_id = request.form["category"].split(",")
 
         if item:
+            if item.user_id != user.id:
+                flash("You can't edit the item of another user")
+                return redirect(url_for("showLogin"))
             item.name = item_name
             item.description = description
             cat = session.query(Category).filter_by(id=category_id).one()
@@ -311,7 +321,8 @@ def item_add_edit(item_id=None):
             item = Item(
                 name=item_name,
                 description=description,
-                category_id=category_id
+                category_id=category_id,
+                user_id=user.id
             )
             session.add(item)
         session.commit()
@@ -328,23 +339,25 @@ def item_add_edit(item_id=None):
 def item_add():
     user = UserControl.current_user()
     if not user or login_session['user_id'] != user.id:
-        abort(401)
-    return item_add_edit()
+        return redirect(url_for("showLogin"))
+    return item_add_edit(user)
 
 
 @app.route("/catalog/item/edit/<int:item_id>", methods=['GET', 'POST'])
 def item_edit(item_id):
     user = UserControl.current_user()
     if not user or login_session['user_id'] != user.id:
-        abort(401)
-    return item_add_edit(item_id)
+        return redirect(url_for("showLogin"))
+    return item_add_edit(user, item_id)
 
 
 @app.route("/catalog/item/delete/<int:item_id>", methods=['GET', 'POST'])
 def item_delete(item_id):
+    """CRUD for items. Delete operation.
+    """
     user = UserControl.current_user()
     if not user or login_session['user_id'] != user.id:
-        abort(401)
+        return redirect(url_for("showLogin"))
     if item_id:
         item = session.query(Item).filter_by(id=item_id).first()
     if request.method == "GET":
@@ -352,6 +365,11 @@ def item_delete(item_id):
     elif request.method == "POST":
         if not item:
             return redirect(url_for('error_ocurred'))
+
+        if item.user_id != user.id:
+            flash("You can't delete the item of another user")
+            return redirect(url_for("showLogin"))
+
         item_name = item.name
         cat_name = item.category.name
 
@@ -368,6 +386,9 @@ def item_delete(item_id):
 
 @app.route("/catalog/<category>/<item>", methods=["GET"])
 def item_show(category, item):
+    """Show the itemws given a category and item id.
+    """
+
     # must be unique
     cat = session.query(Category).filter_by(name=category).first()
     if not cat:
@@ -380,7 +401,7 @@ def item_show(category, item):
         return redirect(url_for("page_not_found"))
     return render_template("item.html", item=item)
 
-
+# Custom error handlers - just a fancy thing
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('page_not_found.html'), 404

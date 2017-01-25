@@ -1,3 +1,15 @@
+"""Database set up module.
+
+This module has the models and the  code to set up the database.
+By default we use `sqlite`.
+
+To create an empty database run:
+
+   $ python database_setup.py
+
+This command will create a `categories.db` database.
+"""
+
 import json
 
 from sqlalchemy.sql import func
@@ -51,6 +63,11 @@ class Item(Base):
     user = relationship(User)
 
     def serialize(self):
+        """Serialize the object into a python dictionary.
+
+        Returns:
+            A python dictionary with the content of the Item.
+        """
 
         item = {
             "id": self.id,
@@ -64,6 +81,11 @@ class Item(Base):
         return item
 
     def json(self):
+        """Serialize the object and return a JSON string.
+
+        Returns:
+            str: a JSON representation of the `item`.
+        """
         return json.dumps(self.serialize())
 
 
